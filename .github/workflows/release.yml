@@ -1,0 +1,102 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write  # required by softprops/action-gh-release
+
+jobs:
+  build:
+    name: Build Windows release binary
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - name: Set up Python 3.12
+        run: uv python install 3.12
+
+      - name: Sync dependencies (with build extras)
+        run: uv sync --all-extras
+
+      - name: Read version from tag
+        id: version
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $version = $tag -replace '^v', ''
+          "version=$version" >> $env:GITHUB_OUTPUT
+          Write-Host "version=$version"
+
+      - name: Build with PyInstaller
+        run: uv run pyinstaller --noconfirm --clean build/dental-bridge.spec
+
+      - name: Smoke test
+        run: dist\dental-bridge.exe --version
+
+      - name: Rename + checksum
+        id: artifacts
+        shell: pwsh
+        run: |
+          $version = "${{ steps.version.outputs.version }}"
+          $name = "dental-bridge-$version-windows-x64.exe"
+          $sha  = "$name.sha256"
+          New-Item -ItemType Directory -Force release | Out-Null
+          Copy-Item dist\dental-bridge.exe "release\$name"
+          $hash = (Get-FileHash "release\$name" -Algorithm SHA256).Hash
+          "$hash *$name" | Out-File -FilePath "release\$sha" -Encoding ASCII
+          "name=$name" >> $env:GITHUB_OUTPUT
+          "sha=$sha"   >> $env:GITHUB_OUTPUT
+          "hash=$hash" >> $env:GITHUB_OUTPUT
+          Write-Host "SHA-256: $hash"
+
+      - name: Extract CHANGELOG section for this version
+        shell: bash
+        run: |
+          version="${{ steps.version.outputs.version }}"
+          awk -v ver="$version" '
+            $0 ~ "^## \\[" ver "\\]" { capture = 1; print; next }
+            capture && /^## \[/        { exit }
+            capture                    { print }
+          ' CHANGELOG.md > release/RELEASE_NOTES.md
+          if [ ! -s release/RELEASE_NOTES.md ]; then
+            echo "## ${version}" > release/RELEASE_NOTES.md
+            echo "" >> release/RELEASE_NOTES.md
+            echo "_No CHANGELOG entry found for this tag._" >> release/RELEASE_NOTES.md
+          fi
+          {
+            echo ""
+            echo "### Integrity"
+            echo ""
+            echo '```'
+            echo "SHA-256: ${{ steps.artifacts.outputs.hash }}"
+            echo "File:    ${{ steps.artifacts.outputs.name }}"
+            echo '```'
+            echo ""
+            echo "Verify with: \`Get-FileHash .\\${{ steps.artifacts.outputs.name }} -Algorithm SHA256\` (PowerShell)."
+            echo ""
+            echo "### Important — unsigned binary"
+            echo ""
+            echo "This release is **not** code-signed. Windows SmartScreen will warn on first run."
+            echo "Click *More info → Run anyway* after confirming the SHA-256 matches the value above."
+            echo "See [\`docs/windows-deployment.md\`](docs/windows-deployment.md) for the full flow."
+          } >> release/RELEASE_NOTES.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          body_path: release/RELEASE_NOTES.md
+          files: |
+            release/${{ steps.artifacts.outputs.name }}
+            release/${{ steps.artifacts.outputs.sha }}
+          draft: false
+          prerelease: ${{ startsWith(steps.version.outputs.version, '0.') }}

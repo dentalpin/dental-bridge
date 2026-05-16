@@ -1,0 +1,35 @@
+services:
+  mssql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    platform: linux/amd64
+    container_name: gesden-mssql
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: ${SA_PASSWORD}
+      MSSQL_PID: Developer
+    ports:
+      - "1433:1433"
+    volumes:
+      - ./data:/var/opt/mssql/gesden
+      - ./sql:/sql:ro
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$$MSSQL_SA_PASSWORD" -C -Q "SELECT 1" || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  metabase:
+    image: metabase/metabase:latest
+    container_name: gesden-metabase
+    ports:
+      - "3001:3000"
+    volumes:
+      - ./metabase-data:/metabase-data
+    environment:
+      MB_DB_FILE: /metabase-data/metabase.db
+    depends_on:
+      mssql:
+        condition: service_healthy

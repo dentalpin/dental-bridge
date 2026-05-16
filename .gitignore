@@ -1,0 +1,70 @@
+# Clinical data — NEVER commit
+.env
+data/
+metabase-data/
+bbdd/
+*.MDF
+*.LDF
+*.bak
+*.dpm
+*.dpm.enc
+clinica-files.manifest.json
+
+# macOS / IDE
+.DS_Store
+.claude/
+.idea/
+.vscode/
+
+# Screenshots de exploración
+docs/*.png
+docs/*.jpg
+docs/*.jpeg
+docs/*.gif
+docs/Captura*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg
+*.egg-info/
+.eggs/
+build/
+dist/
+develop-eggs/
+.installed.cfg
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+.hypothesis/
+
+# uv
+.venv/
+.python-version
+
+# PyInstaller / Windows builds
+*.spec.bak
+*.exe
+release/
+artifacts/
+
+# Logs / local state
+.dental-bridge/
+logs/
+*.log
+
+# Private legal evidence — keep template, ignore filled instances
+legal/PROVENANCE.md
+legal/provenance-*.md
+legal/*.signed.pdf
+_local_evidence/
