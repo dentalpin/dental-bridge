@@ -116,9 +116,7 @@ def test_invalid_time_int_becomes_null() -> None:
         (99, AppointmentStatus.UNKNOWN),
     ],
 )
-def test_status_code_mapping(
-    id_sit_c: object, expected: AppointmentStatus
-) -> None:
+def test_status_code_mapping(id_sit_c: object, expected: AppointmentStatus) -> None:
     row = _baseline_row()
     row["IdSitC"] = id_sit_c
     a = transform(row, _ctx())

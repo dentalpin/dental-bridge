@@ -21,10 +21,10 @@ A natural quadrant order falls out:
 
 | Bits   | Quadrant            | FDI range  | Formula              |
 |--------|---------------------|------------|----------------------|
-|  0– 7  | upper-right (1)     | 18→11      | ``18 - bit``         |
-|  8–15  | upper-left  (2)     | 21→28      | ``13 + bit``         |
-| 16–23  | lower-right (4)     | 48→41      | ``64 - bit``         |
-| 24–31  | lower-left  (3)     | 31→38      | ``7 + bit``          |
+|  0- 7  | upper-right (1)     | 18->11     | ``18 - bit``         |
+|  8-15  | upper-left  (2)     | 21->28     | ``13 + bit``         |
+| 16-23  | lower-right (4)     | 48->41     | ``64 - bit``         |
+| 24-31  | lower-left  (3)     | 31->38     | ``7 + bit``          |
 
 ``PiezasLec`` follows the same shape but indexes the deciduous
 quadrants 5/6/8/7 — the source database barely uses it (mostly
@@ -71,8 +71,8 @@ def _deciduous_fdi_for_bit(bit: int) -> int | None:
 
     Deciduous quadrants are 5 (UR), 6 (UL), 7 (LL), 8 (LR). Five teeth
     per quadrant (e to a → 1 to 5). The bit order mirrors the adult
-    quadrant pattern: UR first (bits 0–4), UL (5–9), LR (10–14),
-    LL (15–19).
+    quadrant pattern: UR first (bits 0-4), UL (5-9), LR (10-14),
+    LL (15-19).
     """
     if 0 <= bit <= 4:
         return 55 - bit  # 55..51
