@@ -56,7 +56,7 @@ def test_all_canonical_refs_resolved() -> None:
     assert a.patient_uuid == derive_canonical_uuid("gesden", "patient", "42")
     assert a.client_uuid == derive_canonical_uuid("gesden", "client", "50")
     assert a.center_uuid == derive_canonical_uuid("gesden", "center", "1")
-    assert a.professional_uuid == derive_canonical_uuid("gesden", "professional", "7")
+    assert a.professional_uuid == derive_canonical_uuid("gesden", "professional", "usuagd:7")
     assert a.chair_uuid == derive_canonical_uuid("gesden", "catalog_item", "chair:2")
     assert a.status_uuid == derive_canonical_uuid("gesden", "catalog_item", "appointment_status:3")
 

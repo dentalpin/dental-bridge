@@ -66,6 +66,17 @@ def _resolve(ctx: TransformContext, entity_type: str, source_id: object | None):
     return derive_canonical_uuid(ctx.source_system, entity_type, str(source_id))
 
 
+def _resolve_professional_from_usuagd(ctx: TransformContext, id_usu: object | None):
+    """Resolve to the TUsuAgd-keyed professional canonical UUID.
+
+    Mirrors the keying convention used by ``extractors/professionals.py``
+    when it unions TUsuAgd entries: ``source_id = f"usuagd:{IdUsu}"``.
+    """
+    if id_usu in (None, "", 0, -1):
+        return None
+    return derive_canonical_uuid(ctx.source_system, "professional", f"usuagd:{id_usu}")
+
+
 def _resolve_catalog(ctx: TransformContext, kind: str, source_id: object | None):
     if source_id in (None, "", 0):
         return None
@@ -86,7 +97,13 @@ def transform(row: dict[str, Any], ctx: TransformContext) -> CanonicalAppointmen
         patient_uuid=_resolve(ctx, "patient", row.get("IdPac")),
         client_uuid=_resolve(ctx, "client", row.get("IdCli")),
         center_uuid=_resolve(ctx, "center", row.get("IdCentro")),
-        professional_uuid=_resolve(ctx, "professional", row.get("IdCol")),
+        # Gesdén's appointment owner is `DCitas.IdUsu` (a TUsuAgd FK),
+        # not `IdCol` — the latter is only populated when a *second*
+        # collaborator is attached, which clinics rarely use. We point
+        # at the TUsuAgd-derived professional UUID (``usuagd:<IdUsu>``)
+        # so the importer can resolve a real professional for ~100% of
+        # appointments instead of the ~3% covered by IdCol alone.
+        professional_uuid=_resolve_professional_from_usuagd(ctx, row.get("IdUsu")),
         chair_uuid=_resolve_catalog(ctx, "chair", row.get("IdBox")),
         status_uuid=_resolve_catalog(ctx, "appointment_status", row.get("IdSitC")),
         recurrence_uuid=_resolve(ctx, "appointment_recurrence", row.get("IdCitasP")),

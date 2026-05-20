@@ -1,4 +1,12 @@
-"""Transform a Gesdén ``TColabos`` row into :class:`CanonicalProfessional`."""
+"""Transform a Gesdén ``TColabos`` or ``TUsuAgd`` row into :class:`CanonicalProfessional`.
+
+The extractor unions both tables under a single query. Rows from
+``TColabos`` carry an ``IdTipoColab`` numeric role; rows from
+``TUsuAgd`` arrive with ``source_table='tusuagd'`` and a synthetic
+``pk`` prefixed by ``usuagd:`` so canonical UUIDs from each source
+never collide. ``DCitas.IdUsu`` resolves to the ``usuagd:<IdUsu>``
+canonical UUID — see ``transformers/appointments.py``.
+"""
 
 from __future__ import annotations
 
@@ -16,9 +24,6 @@ from dental_bridge.core.canonical.professional import (
     ProfessionalRole,
 )
 
-# Gesdén's IdTipoColab is a small integer with site-specific semantics.
-# The mapping below is a best-effort default; clinics with custom
-# IdTipoColab values can override via a future configuration file.
 _DEFAULT_ROLE_MAP: dict[int, ProfessionalRole] = {
     1: ProfessionalRole.DOCTOR,
     2: ProfessionalRole.HYGIENIST,
@@ -37,7 +42,10 @@ def _decode_role(value: object | None) -> ProfessionalRole:
 
 
 def transform(row: dict[str, Any], ctx: TransformContext) -> CanonicalProfessional:
-    source_id = str(row["IdCol"])
+    # `pk` is provided by the extractor's union query; for legacy
+    # callers that still pass `IdCol` (e.g. existing unit tests), fall
+    # back to the integer key so the transformer keeps working.
+    source_id = str(row.get("pk") or row["IdCol"])
     return CanonicalProfessional(
         canonical_uuid=derive_canonical_uuid(ctx.source_system, "professional", source_id),
         source_system=ctx.source_system,

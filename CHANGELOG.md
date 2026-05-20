@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Fixed
+
+- **Gesdén appointment owner now resolves for ~100% of slots.** Before
+  this fix `DCitas.IdCol` (the optional second-collaborator field)
+  was used to derive `professional_uuid`; in real clinics IdCol is
+  empty for ~96% of appointments, leaving most importable rows orphan.
+  The transformer now derives the professional from `DCitas.IdUsu`
+  (the column-owner / TUsuAgd FK, per `docs/schema_map.md`). To make
+  every IdUsu resolvable, the professional extractor now unions
+  `TColabos` with the subset of `TUsuAgd` rows that lack an `IdCol`
+  link, emitting them as canonical professionals with `source_id =
+  "usuagd:<IdUsu>"`. Validated end-to-end against the real SOURCE_DB:
+  appointments with both patient and professional refs rose from
+  4,544 (3.3%) to 109,654 (79.3%); the remaining 28,607 are calendar
+  blocks with `IdPac IS NULL` (legitimately patient-less).
+
 ## [0.1.0] — 2026-05-14
 
 First public release. The full migration loop from a live Gesdén
