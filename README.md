@@ -1,7 +1,7 @@
 # dental-bridge
 
 > Open source migration toolkit for dental practice management systems.
-> First connector: **Gesdén**. Reference destination: **Dentalpin**.
+> First connector: **Gesdén**.
 > Output format: **DPMF — Dental Practice Migration Format** (open standard).
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
