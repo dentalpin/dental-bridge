@@ -4,6 +4,10 @@ from __future__ import annotations
 
 from typing import Any
 
+from dental_bridge.adapters.gesden.decoders.odontogram import (
+    decode_piezas_adu,
+    decode_piezas_lec,
+)
 from dental_bridge.adapters.gesden.decoders.sentinel_dates import clean_date
 from dental_bridge.adapters.gesden.transformers._context import (
     TransformContext,
@@ -83,5 +87,6 @@ def transform(row: dict[str, Any], ctx: TransformContext) -> CanonicalBudgetLine
         notes=normalise_string(row.get("Notas")),
         time_units=coerce_int(row.get("Tiempo")),
         odontogram_raw=_odontogram_dict(row),
+        teeth=decode_piezas_adu(row.get("PiezasAdu")) + decode_piezas_lec(row.get("PiezasLec")),
         tenant_label=tenant_str(row.get("Guid_Tenant")),
     )

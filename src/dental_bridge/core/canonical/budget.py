@@ -95,5 +95,13 @@ class CanonicalBudgetLine(BaseCanonicalEntity):
 
     # Odontogram raw (same handling as AppliedTreatment).
     odontogram_raw: dict[str, int | None] = Field(default_factory=dict)
+    teeth: list[int] = Field(
+        default_factory=list,
+        description=(
+            "FDI numbers decoded from PiezasAdu (adult) + PiezasLec (deciduous). "
+            "Mirrors the field on ``CanonicalAppliedTreatment``; surface decoding "
+            "is intentionally out of scope until validated against Gesdén UI."
+        ),
+    )
 
     tenant_label: str | None = None

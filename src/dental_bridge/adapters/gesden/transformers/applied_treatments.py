@@ -5,6 +5,10 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
+from dental_bridge.adapters.gesden.decoders.odontogram import (
+    decode_piezas_adu,
+    decode_piezas_lec,
+)
 from dental_bridge.adapters.gesden.decoders.sentinel_dates import clean_date
 from dental_bridge.adapters.gesden.transformers._context import (
     TransformContext,
@@ -101,6 +105,7 @@ def transform(row: dict[str, Any], ctx: TransformContext) -> CanonicalAppliedTre
         sessions_performed=coerce_int(row.get("SesRealiz")),
         notes=normalise_string(row.get("Notas")),
         odontogram_raw=_odontogram_dict(row),
+        teeth=decode_piezas_adu(row.get("PiezasAdu")) + decode_piezas_lec(row.get("PiezasLec")),
         document_number=normalise_string(row.get("NumDocUnico")),
         transaction_number=(
             str(row["NumTransaccion"]) if row.get("NumTransaccion") not in (None, "") else None

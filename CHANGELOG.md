@@ -6,6 +6,24 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## Unreleased
 
+### Added
+
+- **Odontogram decoder for Gesdén ``PiezasAdu`` / ``PiezasLec``.** The
+  canonical ``applied_treatment`` and ``budget_line`` entities now
+  expose ``teeth: list[int]`` carrying the FDI numbers decoded from
+  the 32-bit per-tooth bit-masks. The mapping was reverse-engineered
+  from frequency analysis against ``SOURCE_DB`` — the four top
+  ``IdTipoOdg=24`` (implant) bit positions land on the four first
+  molars (FDI 16/26/36/46), which is the dominant implant target in
+  the dental literature. Quadrants are laid out 0-7 (UR 18→11),
+  8-15 (UL 21→28), 16-23 (LR 48→41), 24-31 (LL 31→38); deciduous
+  mirrors the same shape in quadrants 5/6/8/7. Surface decoding
+  (``ZonasPieza``) is intentionally left for a follow-up pass —
+  attempting it without UI validation would silently corrupt the
+  destination odontogram. Validated against the real DB:
+  64,318/252,937 applied treatments (25 %) and 119,078/385,074
+  budget lines (31 %) now carry decoded teeth.
+
 ### Fixed
 
 - **Gesdén appointment owner now resolves for ~100% of slots.** Before

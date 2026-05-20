@@ -88,7 +88,16 @@ class CanonicalAppliedTreatment(BaseCanonicalEntity):
             "Verbatim copies of the source columns that encode the tooth/surface "
             "selection: zonas_pieza, piezas_adu, piezas_lec, piezas_num, "
             "id_tipo_odg, cuadrantes, arcadas, desp_x, desp_y, rotacion. "
-            "Decoding is deferred to a later sprint pending UI validation."
+            "Decoding for surfaces (zonas_pieza) is deferred pending UI validation."
+        ),
+    )
+    teeth: list[int] = Field(
+        default_factory=list,
+        description=(
+            "FDI numbers decoded from PiezasAdu (adult) + PiezasLec (deciduous). "
+            "Empty when the source row carries no tooth selection or the value is "
+            "0. Best-effort mapping reverse-engineered from frequency analysis — "
+            "see ``adapters/gesden/decoders/odontogram.py``."
         ),
     )
 
