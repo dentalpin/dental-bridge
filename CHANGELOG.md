@@ -6,6 +6,31 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## Unreleased
 
+### Fixed (continued)
+
+- **Appointment status mapping (``DCitas.IdSitC``) had four wrong
+  entries.** The previous map sent the dominant Gesdén status
+  ``5`` (Finalizada — treatment done) to ``CANCELLED``,
+  ``1`` (Anulada — cancelled) to ``SCHEDULED``, ``4`` (Consulta) to
+  ``NO_SHOW``, and only covered five of the eleven catalog codes.
+  On the live export that flipped ~57 k attended appointments into
+  "cancelled" in the destination and the 48 k actually-cancelled
+  ones into "scheduled". The map is now validated against the live
+  ``TSitCita`` table (0 Planificada → SCHEDULED, 1 Anulada →
+  CANCELLED, 2 Recepción / 3 Sala Espera / 7 Confirmada / 9 Enviado
+  → CONFIRMED, 4 Consulta / 5 Finalizada / 8 Encuesta → ATTENDED,
+  6 Fallada → NO_SHOW, 10 Anulada WhatsApp → CANCELLED). A
+  parametrised test pins every entry plus the ``None`` /
+  out-of-range fallback to ``UNKNOWN``.
+- **TUsuAgd-derived professionals carry their label as Apellidos.**
+  The extractor unions ``TUsuAgd`` rows when ``TColabos.IdCol`` is
+  unset; the Descripcio column (a single-string identifier like
+  "MARTINEZ SALMERON" or "DRA. VAZQUEZ") was being routed to
+  ``Nombre``, which meant the destination user landed as
+  ``first_name="MARTINEZ SALMERON" last_name="—"``. Routing it to
+  ``Apellidos`` instead gives the conventional Spanish
+  ``first_name="Profesional" last_name="MARTINEZ SALMERON"`` shape.
+
 ### Added
 
 - **Odontogram decoder for Gesdén ``PiezasAdu`` / ``PiezasLec``.** The

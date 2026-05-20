@@ -22,17 +22,37 @@ from dental_bridge.core.canonical.appointment import (
 )
 from dental_bridge.core.canonical.base import derive_canonical_uuid
 
-# Best-effort mapping from Gesdén's ``IdSitC`` numeric status codes to the
-# coarse canonical taxonomy. The actual semantics are defined in the
-# clinic's TSitCita table — that's why the full status_uuid (pointing at
-# the catalog entry) is always emitted too. This map only powers the
-# convenience ``coarse_status`` field.
+# Mapping from Gesdén's ``IdSitC`` numeric status codes (TSitCita) to
+# the coarse canonical taxonomy. Validated against the live ``TSitCita``
+# catalog in SOURCE_DB:
+#
+#   0  Planificada       → SCHEDULED
+#   1  Anulada           → CANCELLED
+#   2  Recepción         → CONFIRMED (patient arrived, awaiting consult)
+#   3  Sala Espera       → CONFIRMED
+#   4  Consulta          → ATTENDED  (in the chair)
+#   5  Finalizada        → ATTENDED  (treatment done, by far the most common)
+#   6  Fallada           → NO_SHOW
+#   7  Confirmada        → CONFIRMED
+#   8  Encuesta          → ATTENDED  (post-visit survey state)
+#   9  Enviado           → CONFIRMED (appointment reminder sent)
+#   10 Anulada WhatsApp  → CANCELLED
+#
+# The full ``status_uuid`` pointing at the catalog entry is still
+# emitted alongside ``coarse_status`` so destinations that want the
+# original code can fish it out.
 _DEFAULT_STATUS_MAP: dict[int, AppointmentStatus] = {
-    1: AppointmentStatus.SCHEDULED,
+    0: AppointmentStatus.SCHEDULED,
+    1: AppointmentStatus.CANCELLED,
     2: AppointmentStatus.CONFIRMED,
-    3: AppointmentStatus.ATTENDED,
-    4: AppointmentStatus.NO_SHOW,
-    5: AppointmentStatus.CANCELLED,
+    3: AppointmentStatus.CONFIRMED,
+    4: AppointmentStatus.ATTENDED,
+    5: AppointmentStatus.ATTENDED,
+    6: AppointmentStatus.NO_SHOW,
+    7: AppointmentStatus.CONFIRMED,
+    8: AppointmentStatus.ATTENDED,
+    9: AppointmentStatus.CONFIRMED,
+    10: AppointmentStatus.CANCELLED,
 }
 
 

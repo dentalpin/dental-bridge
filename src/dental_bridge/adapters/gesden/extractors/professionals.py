@@ -42,8 +42,14 @@ SELECT
     'tusuagd' AS source_table,
     'usuagd:' + CAST(u.IdUsu AS NVARCHAR(50)) AS pk,
     NULL AS Codigo,
-    u.Descripcio AS Nombre,
-    NULL AS Apellidos,
+    NULL AS Nombre,
+    u.Descripcio AS Apellidos,  -- TUsuAgd carries a single label
+                                -- (often a surname, sometimes a first
+                                -- name or "DRA. SURNAME"). Routing it
+                                -- to Apellidos makes the destination
+                                -- user show as "Profesional <label>"
+                                -- which is the closest match for
+                                -- Spanish dental clinic conventions.
     NULL AS NIF,
     NULL AS IdTipoColab
 FROM TUsuAgd u
