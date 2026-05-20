@@ -6,6 +6,16 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## Unreleased
 
+### Added
+
+- **Patient-level free-text notes** are now extracted from
+  ``Pacientes.Notas`` into ``CanonicalPatient.notes``. Spanish dental
+  clinics keep ~46 % of their anamnesis, allergies and observations in
+  this column (alongside the ``AlertPac`` popup table). Downstream
+  importers can now mirror it into their clinical-notes store and
+  classifiers; previously the whole column was dropped. Bumps the
+  Gesdén ``ADAPTER_VERSION`` to ``0.0.2`` to mark the schema change.
+
 ### Fixed (continued)
 
 - **Appointment status mapping (``DCitas.IdSitC``) had four wrong

@@ -99,6 +99,7 @@ def transform(row: dict[str, Any], ctx: TransformContext) -> CanonicalPatient:
         deceased=bool(row.get("Exitus")),
         deceased_at=None,
         gdpr_consent=_bool_or_none(row.get("AceptaLOPD")),
+        notes=normalise_string(row.get("Notas")),
         default_center_uuid=_resolve(ctx, "center", row.get("IdCentro")),
         default_professional_uuid=_resolve(ctx, "professional", row.get("IdCol")),
         guardian_client_uuid=guardian_uuid,

@@ -33,6 +33,7 @@ SELECT
     p.IdCol,
     p.IdCentro,
     p.IdPacReferidor,
+    p.Notas,
     p.Guid_Tenant
 FROM Pacientes p
 ORDER BY p.IdPac

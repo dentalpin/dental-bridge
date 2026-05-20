@@ -58,6 +58,19 @@ class CanonicalPatient(BaseCanonicalEntity):
         description="Whether the source PMS records explicit GDPR consent.",
     )
 
+    # Clinical narrative -----------------------------------------------------
+    notes: str | None = Field(
+        default=None,
+        description=(
+            "Free-text clinical / administrative annotations stored on the "
+            "patient record itself (Gesdén ``Pacientes.Notas`` — typically "
+            "anamnesis, allergies, observations). Importers should mirror "
+            "this into their destination clinical-notes store as a "
+            "patient-level note; leaving it on the patient row alone keeps "
+            "it invisible to the timeline UI most PMSs ship."
+        ),
+    )
+
     # Foreign references (resolved via id_mapping) --------------------------
     default_center_uuid: UUID | None = None
     default_professional_uuid: UUID | None = None
