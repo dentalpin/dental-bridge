@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import date
 from enum import StrEnum
 
 from pydantic import Field
@@ -49,5 +50,15 @@ class CanonicalProfessional(BaseCanonicalEntity):
     phone: str | None = None
 
     deactivated: bool = False
+
+    last_activity_at: date | None = Field(
+        default=None,
+        description=(
+            "Most recent date the source PMS has any clinical trace for this "
+            "professional (treatments, budgets, recalls, appointment rows). "
+            "Destination importers use it to soft-deactivate staff that have "
+            "been inactive for longer than the operator-chosen window."
+        ),
+    )
 
     tenant_label: str | None = None

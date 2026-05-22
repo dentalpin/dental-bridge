@@ -6,8 +6,38 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## Unreleased
 
+### Fixed
+
+- **Appointment ↔ professional reference now resolves on
+  ``DCitas.IdCol`` / ``TUsuAgd.IdCol`` first**, falling back to the
+  ``usuagd:<IdUsu>`` agenda-column key only when both are null. Field
+  observations on real exports show ``DCitas.IdCol`` populated on only
+  ~3 % of rows, while the ``TUsuAgd`` row backing the agenda column
+  almost always points at a TColabos colaborador via its own
+  ``IdCol``. The old code keyed every appointment at
+  ``usuagd:<IdUsu>``, which the professionals extractor only emits for
+  TUsuAgd rows where ``IdCol IS NULL`` — so on a clinic that links
+  every column to a TColabos, the destination resolver dropped ~97 %
+  of appointment→professional refs and the importer logged them as
+  ``appointment.missing_actor``. The new resolver hits the TColabos
+  canonical UUID directly, restoring the link for the full appointment
+  set. Extractor SQL now ``LEFT JOIN TUsuAgd`` and exposes
+  ``OwnerIdCol``; transformer prefers ``IdCol`` → ``OwnerIdCol`` →
+  ``usuagd:<IdUsu>``.
+
 ### Added
 
+- **Professional activity & deactivation signals** are now part of
+  ``CanonicalProfessional``. The Gesdén extractor reads
+  ``TColabos.Activo``, ``TColabos.FecBaja`` and ``TUsuAgd.Status``
+  (projected to the same 'S'/'N' alphabet) and computes
+  ``last_activity_at`` per professional as
+  ``MAX(TtosMed.FecIni, Presu.FecPresup, Recalls.Fecha,
+  DCitas.FecAlta)`` (the ``IdUsu`` branch uses ``DCitas.FecAlta``
+  only). Downstream importers can now soft-deactivate stale or
+  retired staff without losing historical FKs — DentalPin's
+  ``migration_import`` uses this to collapse ~100-row staff lists
+  down to the ~10–20 currently-working clinicians on real exports.
 - **Patient-level free-text notes** are now extracted from
   ``Pacientes.Notas`` into ``CanonicalPatient.notes``. Spanish dental
   clinics keep ~46 % of their anamnesis, allergies and observations in

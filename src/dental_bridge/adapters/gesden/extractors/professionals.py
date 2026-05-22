@@ -28,6 +28,30 @@ if TYPE_CHECKING:
 
 
 _QUERY = """
+WITH activity_col AS (
+    -- Latest clinical trace per TColabos.IdCol. Uses smalldatetime/datetime
+    -- columns directly; DCitas.Fecha is a Gesdén-encoded int so we fall back
+    -- to DCitas.FecAlta (row-insert timestamp), which is good enough for
+    -- "did this professional generate any traffic in the last N months".
+    SELECT IdCol, MAX(act) AS last_activity_at FROM (
+        SELECT IdCol, FecIni    AS act FROM TtosMed  WHERE IdCol IS NOT NULL AND FecIni    IS NOT NULL
+        UNION ALL
+        SELECT IdCol, FecPresup AS act FROM Presu    WHERE IdCol IS NOT NULL AND FecPresup IS NOT NULL
+        UNION ALL
+        SELECT IdCol, Fecha     AS act FROM Recalls  WHERE IdCol IS NOT NULL AND Fecha     IS NOT NULL
+        UNION ALL
+        SELECT IdCol, FecAlta   AS act FROM DCitas   WHERE IdCol IS NOT NULL AND FecAlta   IS NOT NULL
+    ) u
+    GROUP BY IdCol
+),
+activity_usu AS (
+    -- Latest clinical trace per TUsuAgd.IdUsu (agenda column). Only DCitas
+    -- references IdUsu — TtosMed/Presu/Recalls do not.
+    SELECT IdUsu, MAX(FecAlta) AS last_activity_at
+    FROM DCitas
+    WHERE IdUsu IS NOT NULL AND FecAlta IS NOT NULL
+    GROUP BY IdUsu
+)
 SELECT
     'tcolabos' AS source_table,
     CAST(p.IdCol AS NVARCHAR(50)) AS pk,
@@ -35,8 +59,12 @@ SELECT
     p.Nombre,
     p.Apellidos,
     p.NIF,
-    p.IdTipoColab
+    p.IdTipoColab,
+    p.Activo,
+    p.FecBaja,
+    ac.last_activity_at AS LastActivityAt
 FROM TColabos p
+LEFT JOIN activity_col ac ON ac.IdCol = p.IdCol
 UNION ALL
 SELECT
     'tusuagd' AS source_table,
@@ -51,8 +79,15 @@ SELECT
                                 -- which is the closest match for
                                 -- Spanish dental clinic conventions.
     NULL AS NIF,
-    NULL AS IdTipoColab
+    NULL AS IdTipoColab,
+    -- TUsuAgd.Status: 1 = active agenda column, 0 = retired.
+    -- Project to the TColabos 'Activo' char encoding so the transformer
+    -- decodes both rows with the same helper.
+    CASE WHEN u.Status = 0 THEN 'N' ELSE 'S' END AS Activo,
+    NULL AS FecBaja,
+    au.last_activity_at AS LastActivityAt
 FROM TUsuAgd u
+LEFT JOIN activity_usu au ON au.IdUsu = u.IdUsu
 WHERE u.IdCol IS NULL  -- skip if already represented in TColabos
 ORDER BY pk
 """

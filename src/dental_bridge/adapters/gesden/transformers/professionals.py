@@ -6,12 +6,17 @@ The extractor unions both tables under a single query. Rows from
 ``pk`` prefixed by ``usuagd:`` so canonical UUIDs from each source
 never collide. ``DCitas.IdUsu`` resolves to the ``usuagd:<IdUsu>``
 canonical UUID — see ``transformers/appointments.py``.
+
+Activity columns (``Activo``, ``FecBaja``, ``LastActivityAt``) drive
+``deactivated`` and ``last_activity_at`` so destination importers can
+soft-deactivate former staff without breaking historical FKs.
 """
 
 from __future__ import annotations
 
 from typing import Any
 
+from dental_bridge.adapters.gesden.decoders.sentinel_dates import clean_date
 from dental_bridge.adapters.gesden.transformers._context import (
     TransformContext,
     normalise_national_id,
@@ -41,6 +46,18 @@ def _decode_role(value: object | None) -> ProfessionalRole:
         return ProfessionalRole.OTHER
 
 
+def _decode_deactivated(activo: object | None, fec_baja: object | None) -> bool:
+    # TColabos uses two redundant signals: ``Activo`` char ('S'/'N') and
+    # ``FecBaja`` smalldatetime. TUsuAgd's ``Status`` is projected to the
+    # same 'S'/'N' encoding by the extractor. Either marker = deactivated.
+    if fec_baja is not None and clean_date(fec_baja) is not None:
+        return True
+    if activo is None:
+        return False
+    token = str(activo).strip().upper()
+    return token == "N"
+
+
 def transform(row: dict[str, Any], ctx: TransformContext) -> CanonicalProfessional:
     # `pk` is provided by the extractor's union query; for legacy
     # callers that still pass `IdCol` (e.g. existing unit tests), fall
@@ -58,4 +75,6 @@ def transform(row: dict[str, Any], ctx: TransformContext) -> CanonicalProfession
         family_name=normalise_string(row.get("Apellidos")),
         national_id=normalise_national_id(row.get("NIF")),
         role=_decode_role(row.get("IdTipoColab")),
+        deactivated=_decode_deactivated(row.get("Activo"), row.get("FecBaja")),
+        last_activity_at=clean_date(row.get("LastActivityAt")),
     )
