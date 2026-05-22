@@ -97,6 +97,43 @@ def _resolve_professional_from_usuagd(ctx: TransformContext, id_usu: object | No
     return derive_canonical_uuid(ctx.source_system, "professional", f"usuagd:{id_usu}")
 
 
+def _resolve_professional(
+    ctx: TransformContext,
+    *,
+    id_col: object | None,
+    owner_id_col: object | None,
+    id_usu: object | None,
+):
+    """Pick the right professional reference for an appointment.
+
+    Priority order:
+
+    1. ``DCitas.IdCol`` — when the operator explicitly tagged the row
+       with a colaborador, trust it. Direct TColabos reference.
+    2. ``TUsuAgd.IdCol`` — recovered via the extractor's LEFT JOIN.
+       Clinics that don't fill ``DCitas.IdCol`` still link each agenda
+       column to a TColabos row through this field. Resolves to the
+       same TColabos canonical UUID as path (1).
+    3. ``usuagd:<IdUsu>`` — fallback used only when the agenda column
+       has no TColabos linkage. Matches the synthetic professional row
+       the extractor emits for those orphan TUsuAgd entries.
+
+    The first two paths key on ``str(id_col)`` to match
+    ``extractors/professionals.py``'s ``CAST(p.IdCol AS NVARCHAR(50)) AS
+    pk`` projection. Without this priority the appointment lands at
+    ``usuagd:<IdUsu>`` even when a TColabos row exists for the same
+    person — and the destination's resolver drops it because that key
+    is never emitted (the extractor filters TUsuAgd rows with
+    ``IdCol`` set out of the union).
+    """
+    for candidate in (id_col, owner_id_col):
+        if candidate not in (None, "", 0, -1):
+            return derive_canonical_uuid(
+                ctx.source_system, "professional", str(candidate)
+            )
+    return _resolve_professional_from_usuagd(ctx, id_usu)
+
+
 def _resolve_catalog(ctx: TransformContext, kind: str, source_id: object | None):
     if source_id in (None, "", 0):
         return None
@@ -117,13 +154,21 @@ def transform(row: dict[str, Any], ctx: TransformContext) -> CanonicalAppointmen
         patient_uuid=_resolve(ctx, "patient", row.get("IdPac")),
         client_uuid=_resolve(ctx, "client", row.get("IdCli")),
         center_uuid=_resolve(ctx, "center", row.get("IdCentro")),
-        # Gesdén's appointment owner is `DCitas.IdUsu` (a TUsuAgd FK),
-        # not `IdCol` — the latter is only populated when a *second*
-        # collaborator is attached, which clinics rarely use. We point
-        # at the TUsuAgd-derived professional UUID (``usuagd:<IdUsu>``)
-        # so the importer can resolve a real professional for ~100% of
-        # appointments instead of the ~3% covered by IdCol alone.
-        professional_uuid=_resolve_professional_from_usuagd(ctx, row.get("IdUsu")),
+        # Professional resolution priority — see ``_resolve_professional``:
+        #   1. ``DCitas.IdCol``    — explicit per-row colaborador (sparse)
+        #   2. ``TUsuAgd.IdCol``   — colaborador linked to the agenda
+        #                            column (LEFT JOIN in the extractor)
+        #   3. ``usuagd:<IdUsu>``  — orphan agenda column fallback
+        # Real clinics almost never fill (1), so (2) carries the load
+        # by pointing at the TColabos row the receptionist already
+        # picked when they set up the agenda column. Without it the
+        # destination loses ~97% of appointment→professional links.
+        professional_uuid=_resolve_professional(
+            ctx,
+            id_col=row.get("IdCol"),
+            owner_id_col=row.get("OwnerIdCol"),
+            id_usu=row.get("IdUsu"),
+        ),
         chair_uuid=_resolve_catalog(ctx, "chair", row.get("IdBox")),
         status_uuid=_resolve_catalog(ctx, "appointment_status", row.get("IdSitC")),
         recurrence_uuid=_resolve(ctx, "appointment_recurrence", row.get("IdCitasP")),

@@ -18,6 +18,14 @@ if TYPE_CHECKING:
 
 
 _QUERY = """
+-- ``DCitas.IdUsu`` points at TUsuAgd (the agenda column / slot owner)
+-- and is populated on virtually every row, while ``DCitas.IdCol`` (the
+-- explicit per-appointment colaborador) is sparse in real exports
+-- (~3% in field data). We left-join TUsuAgd to recover the colaborador
+-- linked to the agenda column itself (``OwnerIdCol``); the transformer
+-- uses that as the primary professional reference and falls back to
+-- the agenda-user keying (``usuagd:<IdUsu>``) only when both
+-- ``DCitas.IdCol`` and ``TUsuAgd.IdCol`` are null.
 SELECT
     d.IdUsu,
     d.IdOrden,
@@ -26,6 +34,7 @@ SELECT
     d.IdCli,
     d.IdCentro,
     d.IdCol,
+    u.IdCol AS OwnerIdCol,
     d.IdSitC,
     d.IdBox,
     d.Fecha,
@@ -35,6 +44,7 @@ SELECT
     d.IdCitasP,
     d.FecAlta
 FROM DCitas d
+LEFT JOIN TUsuAgd u ON u.IdUsu = d.IdUsu
 ORDER BY d.IdUsu, d.IdOrden
 """
 

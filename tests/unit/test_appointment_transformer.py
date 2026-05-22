@@ -58,9 +58,41 @@ def test_all_canonical_refs_resolved() -> None:
     assert a.patient_uuid == derive_canonical_uuid("gesden", "patient", "42")
     assert a.client_uuid == derive_canonical_uuid("gesden", "client", "50")
     assert a.center_uuid == derive_canonical_uuid("gesden", "center", "1")
-    assert a.professional_uuid == derive_canonical_uuid("gesden", "professional", "usuagd:7")
+    # Baseline row has ``IdCol=7`` set, so the resolver locks in the
+    # TColabos canonical (pk="7") instead of falling back to the
+    # ``usuagd:7`` agenda-column key. See ``_resolve_professional``
+    # priority in ``transformers/appointments.py``.
+    assert a.professional_uuid == derive_canonical_uuid("gesden", "professional", "7")
     assert a.chair_uuid == derive_canonical_uuid("gesden", "catalog_item", "chair:2")
     assert a.status_uuid == derive_canonical_uuid("gesden", "catalog_item", "appointment_status:5")
+
+
+def test_professional_falls_back_to_owner_id_col_when_id_col_missing() -> None:
+    row = _baseline_row()
+    row["IdCol"] = None  # per-appointment colaborador not filled
+    row["OwnerIdCol"] = 12  # TUsuAgd.IdCol → real clinician
+    a = transform(row, _ctx())
+    assert a.professional_uuid == derive_canonical_uuid("gesden", "professional", "12")
+
+
+def test_professional_falls_back_to_usuagd_when_no_col_anywhere() -> None:
+    row = _baseline_row()
+    row["IdCol"] = None
+    row["OwnerIdCol"] = None  # orphan agenda column
+    a = transform(row, _ctx())
+    assert a.professional_uuid == derive_canonical_uuid(
+        "gesden", "professional", "usuagd:7"
+    )
+
+
+def test_professional_owner_id_col_ignored_when_id_col_present() -> None:
+    """``DCitas.IdCol`` (per-row) wins over ``TUsuAgd.IdCol`` (per-column)
+    when both are set — the per-row tag is the operator's explicit pick."""
+    row = _baseline_row()
+    row["IdCol"] = 7  # explicit row-level
+    row["OwnerIdCol"] = 99  # column-level fallback that must NOT win
+    a = transform(row, _ctx())
+    assert a.professional_uuid == derive_canonical_uuid("gesden", "professional", "7")
 
 
 def test_recurrence_link_resolved() -> None:
