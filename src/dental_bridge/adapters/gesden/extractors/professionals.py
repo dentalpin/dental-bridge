@@ -33,14 +33,24 @@ WITH activity_col AS (
     -- columns directly; DCitas.Fecha is a Gesdén-encoded int so we fall back
     -- to DCitas.FecAlta (row-insert timestamp), which is good enough for
     -- "did this professional generate any traffic in the last N months".
+    --
+    -- Appointments bridge: DCitas.IdCol is populated on only ~3 % of rows in
+    -- the field; the real owner sits on DCitas.IdUsu → TUsuAgd.IdCol. We
+    -- count both so a colaborador who only owns work through an agenda
+    -- column does not look "inactive" downstream.
     SELECT IdCol, MAX(act) AS last_activity_at FROM (
-        SELECT IdCol, FecIni    AS act FROM TtosMed  WHERE IdCol IS NOT NULL AND FecIni    IS NOT NULL
+        SELECT IdCol,        FecIni    AS act FROM TtosMed  WHERE IdCol IS NOT NULL AND FecIni    IS NOT NULL
         UNION ALL
-        SELECT IdCol, FecPresup AS act FROM Presu    WHERE IdCol IS NOT NULL AND FecPresup IS NOT NULL
+        SELECT IdCol,        FecPresup AS act FROM Presu    WHERE IdCol IS NOT NULL AND FecPresup IS NOT NULL
         UNION ALL
-        SELECT IdCol, Fecha     AS act FROM Recalls  WHERE IdCol IS NOT NULL AND Fecha     IS NOT NULL
+        SELECT IdCol,        Fecha     AS act FROM Recalls  WHERE IdCol IS NOT NULL AND Fecha     IS NOT NULL
         UNION ALL
-        SELECT IdCol, FecAlta   AS act FROM DCitas   WHERE IdCol IS NOT NULL AND FecAlta   IS NOT NULL
+        SELECT IdCol,        FecAlta   AS act FROM DCitas   WHERE IdCol IS NOT NULL AND FecAlta   IS NOT NULL
+        UNION ALL
+        SELECT u.IdCol,      c.FecAlta AS act
+        FROM DCitas c
+        JOIN TUsuAgd u ON u.IdUsu = c.IdUsu
+        WHERE u.IdCol IS NOT NULL AND c.FecAlta IS NOT NULL
     ) u
     GROUP BY IdCol
 ),

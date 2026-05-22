@@ -127,7 +127,7 @@ def test_tusuagd_orphan_keeps_synthetic_pk_and_role_other() -> None:
         "pk": "usuagd:14",
         "Codigo": None,
         "Nombre": None,
-        "Apellidos": "DRA. FACIL",
+        "Apellidos": "DRA. SAMPLE",
         "NIF": None,
         "IdTipoColab": None,
         # extractor projects TUsuAgd.Status into the same 'S'/'N' alphabet
