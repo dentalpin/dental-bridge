@@ -52,10 +52,45 @@ class CanonicalPatient(BaseCanonicalEntity):
     )
     deceased_at: date | None = None
 
+    # Contact ---------------------------------------------------------------
+    phone: str | None = Field(
+        default=None,
+        description="Primary landline (Gesdén ``Pacientes.Tel1``).",
+    )
+    phone_secondary: str | None = Field(
+        default=None,
+        description="Secondary landline (Gesdén ``Pacientes.Tel2``).",
+    )
+    mobile_phone: str | None = Field(
+        default=None,
+        description="Mobile phone (Gesdén ``Pacientes.TelMovil``).",
+    )
+    fax: str | None = None
+    email: str | None = None
+    address_street: str | None = Field(
+        default=None,
+        description="Free-text street + number (Gesdén ``Pacientes.Direccion``).",
+    )
+    address_postal_code: str | None = Field(
+        default=None,
+        description="Postal code (Gesdén ``Pacientes.CP``).",
+    )
+
     # Consent / privacy -----------------------------------------------------
     gdpr_consent: bool | None = Field(
         default=None,
         description="Whether the source PMS records explicit GDPR consent.",
+    )
+    marketing_consent: bool | None = Field(
+        default=None,
+        description=(
+            "Consent for promotional / informational mailings "
+            "(Gesdén ``Pacientes.AceptaInfo``)."
+        ),
+    )
+    sms_consent: bool | None = Field(
+        default=None,
+        description="Consent for SMS reminders (Gesdén ``Pacientes.AceptaSMS``).",
     )
 
     # Clinical narrative -----------------------------------------------------

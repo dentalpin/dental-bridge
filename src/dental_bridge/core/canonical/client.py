@@ -39,6 +39,27 @@ class CanonicalClient(BaseCanonicalEntity):
     # Common ----------------------------------------------------------------
     national_id: str | None = None
     email: str | None = None
+    phone: str | None = Field(
+        default=None,
+        description="Primary landline (Gesdén ``Clientes.Tel1``).",
+    )
+    phone_secondary: str | None = Field(
+        default=None,
+        description="Secondary landline (Gesdén ``Clientes.Tel2``).",
+    )
+    mobile_phone: str | None = Field(
+        default=None,
+        description="Mobile phone (Gesdén ``Clientes.TelMovil``).",
+    )
+    fax: str | None = None
+    address_street: str | None = Field(
+        default=None,
+        description="Free-text street + number (Gesdén ``Clientes.Direccion``).",
+    )
+    address_postal_code: str | None = Field(
+        default=None,
+        description="Postal code (Gesdén ``Clientes.CP``).",
+    )
 
     # References ------------------------------------------------------------
     default_center_uuid: UUID | None = None

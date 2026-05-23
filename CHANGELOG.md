@@ -6,6 +6,24 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## Unreleased
 
+### Added
+
+- **Patient + client contact data now exported** (gesden adapter
+  bumped to ``0.0.3``). The ``Pacientes`` / ``Clientes`` ``SELECT``
+  lists used to omit every contact column, so the bulk of patient
+  phones, mobiles, emails, addresses and postal codes in a real
+  Gesdén database were dropped on export — destinations could only
+  recover identity, not contact channels. New fields on
+  ``CanonicalPatient``: ``phone``, ``phone_secondary``,
+  ``mobile_phone``, ``fax``, ``email``, ``address_street``,
+  ``address_postal_code``, ``marketing_consent`` (``AceptaInfo``) and
+  ``sms_consent`` (``AceptaSMS``). New fields on ``CanonicalClient``:
+  ``phone``, ``phone_secondary``, ``mobile_phone``, ``fax``,
+  ``address_street``, ``address_postal_code`` (``Mailing`` bit
+  surfaces only via ``raw_source_data``). All new fields are
+  optional and default to ``None`` so older DPMF consumers keep
+  working; the ``0.0.2`` → ``0.0.3`` bump is additive-safe.
+
 ### Fixed
 
 - **Appointment ↔ professional reference now resolves on
