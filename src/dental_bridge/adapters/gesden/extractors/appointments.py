@@ -26,6 +26,52 @@ _QUERY = """
 -- uses that as the primary professional reference and falls back to
 -- the agenda-user keying (``usuagd:<IdUsu>``) only when both
 -- ``DCitas.IdCol`` and ``TUsuAgd.IdCol`` are null.
+--
+-- Many real exports leave ``TUsuAgd.IdCol`` empty even on agenda columns
+-- that obviously belong to a TColabos colaborador (the operator never
+-- linked them). We fuzz-match those orphans by name and use the
+-- resolved IdCol as a secondary fallback so appointment ownership
+-- routes to the real practitioner instead of a synthetic agenda-only
+-- profile. Two-tier match (CodExt then Descripcio) and a uniqueness
+-- guard (``HAVING COUNT(DISTINCT t.IdCol) = 1``) keep the merge safe.
+WITH orphan_stripped AS (
+    SELECT IdUsu,
+        UPPER(LTRIM(RTRIM(Descripcio))) AS desc_u,
+        UPPER(LTRIM(RTRIM(REPLACE(REPLACE(Descripcio, 'DRA.', ''), 'DR.', '')))) AS desc_clean,
+        UPPER(LTRIM(RTRIM(CodExt))) AS code_u
+    FROM TUsuAgd
+    WHERE IdCol IS NULL
+),
+orphan_match_codext AS (
+    SELECT s.IdUsu, MIN(t.IdCol) AS resolved_idcol
+    FROM orphan_stripped s
+    JOIN TColabos t ON t.Activo = 'S' AND LEN(s.code_u) >= 4 AND (
+        UPPER(LTRIM(RTRIM(t.Apellidos))) = s.code_u
+        OR UPPER(LTRIM(RTRIM(t.Apellidos))) LIKE s.code_u + ' %'
+        OR UPPER(LTRIM(RTRIM(t.Apellidos))) LIKE '% ' + s.code_u
+    )
+    GROUP BY s.IdUsu
+    HAVING COUNT(DISTINCT t.IdCol) = 1
+),
+orphan_match_desc AS (
+    SELECT s.IdUsu, MIN(t.IdCol) AS resolved_idcol
+    FROM orphan_stripped s
+    JOIN TColabos t ON t.Activo = 'S' AND (
+        UPPER(LTRIM(RTRIM(t.Apellidos))) = s.desc_u
+        OR UPPER(LTRIM(RTRIM(t.Apellidos))) = s.desc_clean
+        OR UPPER(LTRIM(RTRIM(t.Apellidos))) LIKE s.desc_clean + ' %'
+        OR UPPER(LTRIM(RTRIM(t.Nombre))) = s.desc_u
+        OR UPPER(LTRIM(RTRIM(t.Nombre))) = s.desc_clean
+    )
+    WHERE s.IdUsu NOT IN (SELECT IdUsu FROM orphan_match_codext)
+    GROUP BY s.IdUsu
+    HAVING COUNT(DISTINCT t.IdCol) = 1
+),
+orphan_resolve AS (
+    SELECT IdUsu, resolved_idcol FROM orphan_match_codext
+    UNION ALL
+    SELECT IdUsu, resolved_idcol FROM orphan_match_desc
+)
 SELECT
     d.IdUsu,
     d.IdOrden,
@@ -34,7 +80,7 @@ SELECT
     d.IdCli,
     d.IdCentro,
     d.IdCol,
-    u.IdCol AS OwnerIdCol,
+    COALESCE(u.IdCol, r.resolved_idcol) AS OwnerIdCol,
     d.IdSitC,
     d.IdBox,
     d.Fecha,
@@ -45,6 +91,7 @@ SELECT
     d.FecAlta
 FROM DCitas d
 LEFT JOIN TUsuAgd u ON u.IdUsu = d.IdUsu
+LEFT JOIN orphan_resolve r ON r.IdUsu = d.IdUsu
 ORDER BY d.IdUsu, d.IdOrden
 """
 

@@ -28,7 +28,58 @@ if TYPE_CHECKING:
 
 
 _QUERY = """
-WITH activity_col AS (
+WITH orphan_stripped AS (
+    -- Normalise the agenda-column label for fuzzy matching. ``Descripcio``
+    -- often carries a "DRA. " or "DR. " honorific that does not appear on
+    -- ``TColabos.Apellidos`` — strip it before comparing.
+    SELECT IdUsu,
+        UPPER(LTRIM(RTRIM(Descripcio))) AS desc_u,
+        UPPER(LTRIM(RTRIM(REPLACE(REPLACE(Descripcio, 'DRA.', ''), 'DR.', '')))) AS desc_clean,
+        UPPER(LTRIM(RTRIM(CodExt))) AS code_u
+    FROM TUsuAgd
+    WHERE IdCol IS NULL
+),
+orphan_match_codext AS (
+    -- Priority 1: CodExt (the agenda column's short identifier) usually
+    -- maps to a token inside ``TColabos.Apellidos``. Match only when a
+    -- single TColabos comes out so we never silently fuse two distinct
+    -- colaboradores into one.
+    SELECT s.IdUsu, MIN(t.IdCol) AS resolved_idcol
+    FROM orphan_stripped s
+    JOIN TColabos t ON t.Activo = 'S' AND LEN(s.code_u) >= 4 AND (
+        UPPER(LTRIM(RTRIM(t.Apellidos))) = s.code_u
+        OR UPPER(LTRIM(RTRIM(t.Apellidos))) LIKE s.code_u + ' %'
+        OR UPPER(LTRIM(RTRIM(t.Apellidos))) LIKE '% ' + s.code_u
+    )
+    GROUP BY s.IdUsu
+    HAVING COUNT(DISTINCT t.IdCol) = 1
+),
+orphan_match_desc AS (
+    -- Priority 2: Descripcio token match against Apellidos / Nombre.
+    -- Skip orphans already resolved via CodExt.
+    SELECT s.IdUsu, MIN(t.IdCol) AS resolved_idcol
+    FROM orphan_stripped s
+    JOIN TColabos t ON t.Activo = 'S' AND (
+        UPPER(LTRIM(RTRIM(t.Apellidos))) = s.desc_u
+        OR UPPER(LTRIM(RTRIM(t.Apellidos))) = s.desc_clean
+        OR UPPER(LTRIM(RTRIM(t.Apellidos))) LIKE s.desc_clean + ' %'
+        OR UPPER(LTRIM(RTRIM(t.Nombre))) = s.desc_u
+        OR UPPER(LTRIM(RTRIM(t.Nombre))) = s.desc_clean
+    )
+    WHERE s.IdUsu NOT IN (SELECT IdUsu FROM orphan_match_codext)
+    GROUP BY s.IdUsu
+    HAVING COUNT(DISTINCT t.IdCol) = 1
+),
+orphan_resolve AS (
+    -- Orphan rows that map cleanly back to a single TColabos. Skipped
+    -- from the professional UNION so we don't emit a duplicate canonical
+    -- entity, and used by the appointments extractor to attribute
+    -- ``DCitas.IdUsu`` to the real colaborador.
+    SELECT IdUsu, resolved_idcol FROM orphan_match_codext
+    UNION ALL
+    SELECT IdUsu, resolved_idcol FROM orphan_match_desc
+),
+activity_col AS (
     -- Latest clinical trace per TColabos.IdCol. Uses smalldatetime/datetime
     -- columns directly; DCitas.Fecha is a Gesdén-encoded int so we fall back
     -- to DCitas.FecAlta (row-insert timestamp), which is good enough for
@@ -51,6 +102,16 @@ WITH activity_col AS (
         FROM DCitas c
         JOIN TUsuAgd u ON u.IdUsu = c.IdUsu
         WHERE u.IdCol IS NOT NULL AND c.FecAlta IS NOT NULL
+        UNION ALL
+        -- Bridge via the orphan-resolution CTE: appointments owned by a
+        -- TUsuAgd row whose IdCol is null but which fuzzy-matched a real
+        -- TColabos. Without this branch the matched colaborador would
+        -- still look "inactive" downstream because no appointment row
+        -- references their IdCol directly.
+        SELECT r.resolved_idcol, c.FecAlta AS act
+        FROM DCitas c
+        JOIN orphan_resolve r ON r.IdUsu = c.IdUsu
+        WHERE c.FecAlta IS NOT NULL
     ) u
     GROUP BY IdCol
 ),
@@ -99,6 +160,7 @@ SELECT
 FROM TUsuAgd u
 LEFT JOIN activity_usu au ON au.IdUsu = u.IdUsu
 WHERE u.IdCol IS NULL  -- skip if already represented in TColabos
+  AND u.IdUsu NOT IN (SELECT IdUsu FROM orphan_resolve)  -- skip fuzzy-matched orphans
 ORDER BY pk
 """
 
