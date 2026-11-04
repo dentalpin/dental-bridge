@@ -209,6 +209,8 @@ from dental_bridge.core.pipeline.id_mapping import IdMapping
 if TYPE_CHECKING:
     import pyodbc
 
+    from dental_bridge.adapters.gesden.version_registry import KnownFingerprint
+
 _SIMPLE_ENTITY_PIPELINE: dict[
     str,
     tuple[
@@ -418,6 +420,12 @@ class GesdenAdapter(OriginAdapter):
     @property
     def context(self) -> TransformContext:
         return self._ctx
+
+    @staticmethod
+    def lookup_fingerprint(fingerprint: str) -> KnownFingerprint | None:
+        from dental_bridge.adapters.gesden.version_registry import lookup
+
+        return lookup(fingerprint)
 
     def _iter_catalog_items(self) -> Iterator[BaseCanonicalEntity]:
         conn = self._require_conn()

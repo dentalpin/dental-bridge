@@ -1,7 +1,7 @@
 # dental-bridge
 
 > Open source migration toolkit for dental practice management systems.
-> First connector: **Gesdén**.
+> Connectors: **Gesdén** (SQL Server) and **Nemodent** (Access, extract-only).
 > Output format: **DPMF — Dental Practice Migration Format** (open standard).
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
@@ -10,10 +10,11 @@
 
 ## What it does
 
-`dental-bridge` reads the SQL Server database of a Gesdén installation
-(running on the clinic's Windows server) and produces a single portable file
-that any downstream PMS can ingest. No data leaves the clinic until the
-file is uploaded to a destination of the operator's choice.
+`dental-bridge` reads supported dental PMS databases and produces a single
+portable file that any downstream PMS can ingest. The Gesdén connector reads
+SQL Server; the Nemodent connector reads a local Microsoft Access `.mdb` copy.
+No data leaves the clinic until the file is uploaded to a destination of the
+operator's choice.
 
 ```
 ┌──────────────┐    extract     ┌──────────────┐    upload     ┌──────────────┐
@@ -37,6 +38,9 @@ Gesdén-to-DPMF migration: 32 canonical entity types, four operating
 modes (`analyze` / `plan` / `extract` / `verify`), zstd compression and
 AES-256-GCM encryption layers, validated against a 1.27-million-row
 real clinic dataset.
+
+The Nemodent adapter adds an initial MDB-to-DPMF `extract` path. It does not
+extend the Gesdén-specific `analyze`, `plan` or `verify` commands.
 
 Binaries are distributed **unsigned**. Windows SmartScreen will warn on
 first run; verify the SHA-256 published in the release notes against
@@ -65,13 +69,16 @@ The two digests MUST match. If they do not, do not run the binary.
 
 **Runtime (clinic side):**
 - Windows Server 2012 R2 or later, or Windows 10/11.
-- Microsoft ODBC Driver 18 for SQL Server (installer will detect and prompt).
-- Read access to the Gesdén SQL Server instance (SQL Auth or Windows Auth).
+- Gesdén: Microsoft ODBC Driver 18 for SQL Server and read access to the
+  instance (SQL Auth or Windows Auth).
+- Nemodent: 64-bit Microsoft Access ODBC driver and read access to a local
+  `.mdb` copy.
 
 **Development:**
 - Python 3.12+
 - [uv](https://github.com/astral-sh/uv) for dependency management.
-- Docker (only for running tests against a local Gesdén copy).
+- Docker for Gesdén integration tests; a sanitized or synthetic MDB for
+  Nemodent Access integration tests.
 
 ## Quick start (CLI)
 
@@ -87,6 +94,11 @@ dental-bridge extract --source "gesden://..." --plan plan.yaml --output clinica.
 
 # 4. Verify — reconciliation report (counts, financial totals, sampled deep-diff)
 dental-bridge verify --source "gesden://..." --file clinica.dpm
+
+# Nemodent — extract from a local Access database (extract-only adapter)
+dental-bridge extract --adapter nemodent `
+    --source "C:\Nemodent\Nemodent.mdb" `
+    --output "C:\Nemodent\export.dpm"
 ```
 
 After extract, you can upload `clinica.dpm` to any PMS that supports the
@@ -115,6 +127,8 @@ uv run ruff format --check
 
 See `docs/` for architecture and `CONTRIBUTING.md` for the contribution
 workflow including DCO sign-off.
+See [`docs/nemodent-quirks.md`](docs/nemodent-quirks.md) for Nemodent mapping
+limits and source-specific behavior.
 
 ## Adding a new origin adapter
 

@@ -108,6 +108,9 @@ class DpmfWriter:
         )
 
     def record_entity_count(self, entity_type: str, count: int) -> None:
+        # Every _entities entry requires a physical table, even at row_count=0.
+        # Readers discover entity tables from this index.
+        self._ensure_entity_table(entity_type)
         version = ENTITY_SCHEMA_VERSIONS.get(entity_type, "0.1.0")
         self._conn.execute(
             "INSERT OR REPLACE INTO _entities (entity_type, row_count, schema_version) "

@@ -94,7 +94,9 @@ the whole format.
 
 ### Entity tables
 
-One table per canonical entity type. The column shape is uniform:
+Every row in `_entities` MUST have a corresponding entity table, including
+entity types whose `row_count` is zero. One table exists per canonical entity
+type. The column shape is uniform:
 
 ```sql
 CREATE TABLE <entity_type> (
