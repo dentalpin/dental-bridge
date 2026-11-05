@@ -54,6 +54,7 @@ dental-bridge = "dental_bridge.__main__:main"
 
 [project.entry-points."dental_bridge.adapters"]
 gesden = "dental_bridge.adapters.gesden.adapter:GesdenAdapter"
+nemodent = "dental_bridge.adapters.nemodent.adapter:NemodentAdapter"
 
 [project.urls]
 Homepage = "https://github.com/dentalpin/dental-bridge"

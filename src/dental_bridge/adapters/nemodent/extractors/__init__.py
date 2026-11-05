@@ -1,0 +1,1 @@
+"""Allowlisted Nemodent table readers."""

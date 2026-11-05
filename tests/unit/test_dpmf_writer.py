@@ -13,6 +13,7 @@ import pytest
 from dental_bridge.core.canonical._enums import Sex
 from dental_bridge.core.canonical.base import derive_canonical_uuid
 from dental_bridge.core.canonical.patient import CanonicalPatient
+from dental_bridge.core.dpmf.reader import open_dpmf
 from dental_bridge.core.dpmf.writer import DpmfWriter
 
 _FIXED_TS = datetime(2026, 1, 1, 12, 0, tzinfo=UTC)
@@ -65,6 +66,28 @@ def test_writer_creates_well_formed_file(tmp_path: Path) -> None:
         assert len(rows) == 2
         for _, payload in rows:
             assert json.loads(payload)["entity_type"] == "patient"
+
+
+def test_zero_row_entity_has_a_table_readers_can_query(tmp_path: Path) -> None:
+    output = tmp_path / "empty-entity.dpm"
+    with DpmfWriter(
+        output,
+        source_system="nemodent",
+        source_adapter_version="0.1.0",
+        exporter_version="0.1.0",
+        tenant_label="test-tenant",
+    ) as writer:
+        writer.record_entity_count("applied_treatment_phase", 0)
+        digest = writer.finalise()
+
+    with open_dpmf(output) as conn:
+        entities = dict(conn.execute("SELECT entity_type, row_count FROM _entities"))
+        assert entities["applied_treatment_phase"] == 0
+        assert conn.execute("SELECT COUNT(*) FROM applied_treatment_phase").fetchone()[0] == 0
+        declared_hash = conn.execute(
+            "SELECT value FROM _meta WHERE key='integrity_hash'"
+        ).fetchone()[0]
+        assert declared_hash == digest
 
 
 def test_writer_refuses_unsafe_entity_name(tmp_path: Path) -> None:

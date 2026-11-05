@@ -14,7 +14,7 @@
 
 # pylint: disable=undefined-variable
 
-from PyInstaller.utils.hooks import collect_submodules
+from PyInstaller.utils.hooks import collect_submodules, copy_metadata
 
 block_cipher = None
 
@@ -39,7 +39,7 @@ a = Analysis(
     ["../src/dental_bridge/__main__.py"],
     pathex=["../src"],
     binaries=[],
-    datas=[],
+    datas=copy_metadata("dental-bridge"),
     hiddenimports=hiddenimports,
     hookspath=[],
     runtime_hooks=[],

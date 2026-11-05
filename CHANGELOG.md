@@ -8,6 +8,24 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ### Added
 
+- **Nemodent Access MDB adapter** for read-only DPMF extraction. The adapter
+  uses an explicit source-column allowlist, a metadata-only schema fingerprint,
+  deterministic source identities, and conservative mappings for the supported
+  entities. Later source rows that collide on the same active chair,
+  professional and start time are omitted with a warning. Ambiguous values are
+  preserved as raw data or left out of scope.
+
+### Fixed
+
+- **Zero-row entity tables are now created when their `_entities` count is
+  recorded.** Previously, entity tables were lazy-created only on the first
+  appended row, leaving declared zero-count types (for example
+  `applied_treatment_phase`) without a SQLite table. DPMF validation in
+  migration_import reads every `_entities` type and failed with
+  `no such table`; empty entity tables now satisfy the DPMF v0.1 contract.
+
+### Added
+
 - **Patient + client contact data now exported** (gesden adapter
   bumped to ``0.0.3``). The ``Pacientes`` / ``Clientes`` ``SELECT``
   lists used to omit every contact column, so the bulk of patient

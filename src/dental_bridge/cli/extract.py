@@ -10,14 +10,15 @@ from __future__ import annotations
 import shutil
 import tempfile
 from pathlib import Path
+from typing import Any
 
 import typer
 from rich.console import Console
 from rich.table import Table
 
 from dental_bridge import __version__
-from dental_bridge.adapters.gesden.adapter import GesdenAdapter
-from dental_bridge.adapters.gesden.version_registry import lookup as lookup_fingerprint
+from dental_bridge.core.adapters.origin_abc import OriginAdapter
+from dental_bridge.core.adapters.registry import discover
 from dental_bridge.core.dpmf.compress import compress_file
 from dental_bridge.core.dpmf.crypto import encrypt_file
 from dental_bridge.core.dpmf.writer import DpmfWriter
@@ -44,27 +45,51 @@ def run(
     resume: bool,
     compress: bool,
     dpmf_passphrase: str | None,
+    adapter_name: str = "gesden",
 ) -> int:
-    """Implement ``dental-bridge extract`` against a Gesdén source."""
+    """Implement ``dental-bridge extract`` for a registered origin adapter."""
     if output.exists():
         console.print(f"[red]refusing to overwrite existing file:[/red] {output}")
         return 2
 
-    adapter = GesdenAdapter()
+    adapters = discover()
+    adapter_cls = _resolve_adapter_class(adapter_name, adapters)
+    if adapter_cls is None:
+        console.print(
+            f"[red]unknown adapter:[/red] {adapter_name}. "
+            f"Available adapters: {', '.join(sorted(adapters)) or '(none)'}"
+        )
+        return 2
+
+    if adapter_name == "nemodent" and (
+        user or password or trusted_connection or trust_server_certificate or not encrypt
+    ):
+        console.print(
+            "[red]Nemodent uses a local MDB and does not accept SQL Server "
+            "credentials or TLS options.[/red]"
+        )
+        return 2
+
+    adapter = adapter_cls()
     checkpoint: SqliteCheckpointStore | None = None
     workdir = Path(tempfile.mkdtemp(prefix="dental-bridge-"))
     try:
-        adapter.connect(
-            source,
-            user=user,
-            password=password,
-            trusted_connection=trusted_connection,
-            trust_server_certificate=trust_server_certificate,
-            encrypt=encrypt,
-        )
+        label = tenant_label or _guess_tenant_label(source, adapter_name=adapter_name)
+        if adapter_name == "nemodent":
+            adapter.connect(source, tenant_label=label)
+        else:
+            adapter.connect(
+                source,
+                user=user,
+                password=password,
+                trusted_connection=trusted_connection,
+                trust_server_certificate=trust_server_certificate,
+                encrypt=encrypt,
+            )
 
         fingerprint = adapter.fingerprint()
-        known = lookup_fingerprint(fingerprint)
+        lookup = getattr(adapter, "lookup_fingerprint", None)
+        known = lookup(fingerprint) if callable(lookup) else None
         if known is None:
             console.print(
                 f"[yellow]Schema fingerprint not in registry:[/yellow] [bold]{fingerprint}[/bold]"
@@ -75,10 +100,22 @@ def run(
                     "Please also open an issue and attach the fingerprint."
                 )
                 return 3
+            console.print(
+                "[yellow]Proceeding with an unregistered schema by explicit operator opt-in.[/yellow]"
+            )
+            warnings = _adapter_context_value(adapter, "warnings")
+            if warnings is not None:
+                warnings.add(
+                    severity="warn",
+                    code="source.schema_unknown_override",
+                    message=(
+                        "Extraction continued with --allow-unknown-schema; "
+                        f"fingerprint={fingerprint}."
+                    ),
+                )
         else:
             console.print(f"[green]Schema fingerprint recognised:[/green] {known.description}")
 
-        label = tenant_label or _guess_tenant_label(source)
         run_id = default_run_id(tenant_label=label, source_fingerprint=fingerprint)
 
         if resume:
@@ -98,8 +135,8 @@ def run(
                 adapter,
                 writer,
                 entity_order=adapter.default_entity_order(),
-                id_mapping=adapter.context.id_mapping,
-                warnings=adapter.context.warnings,
+                id_mapping=_adapter_context_value(adapter, "id_mapping"),
+                warnings=_adapter_context_value(adapter, "warnings"),
                 checkpoint=checkpoint,
                 run_id=run_id if checkpoint is not None else None,
             )
@@ -137,13 +174,30 @@ def _materialise(
         shutil.move(str(working), str(final_output))
 
 
-def _guess_tenant_label(source: str) -> str:
+def _guess_tenant_label(source: str, *, adapter_name: str = "gesden") -> str:
     """Default tenant_label to the database name in the DSN.
 
     The operator can override with --tenant-label when they want a more
     descriptive name (e.g. the clinic's short code).
     """
+    if adapter_name == "nemodent":
+        return Path(source).stem or "unknown"
     return source.rsplit("/", 1)[-1] or "unknown"
+
+
+def _adapter_context_value(adapter: object, name: str) -> Any:
+    """Read optional shared state from adapters that supply pipeline registries."""
+    context = getattr(adapter, "context", None)
+    return getattr(context, name, None)
+
+
+def _resolve_adapter_class(
+    adapter_name: str,
+    adapters: dict[str, type[OriginAdapter]] | None = None,
+) -> type[OriginAdapter] | None:
+    """Resolve the selected source through the installed adapter entry points."""
+    available = discover() if adapters is None else adapters
+    return available.get(adapter_name)
 
 
 def _render_summary(
@@ -178,10 +232,15 @@ def _render_summary(
 def register(app: typer.Typer) -> None:
     @app.command(name="extract")
     def extract_cmd(
+        adapter_name: str = typer.Option(
+            "gesden",
+            "--adapter",
+            help="Registered origin adapter to use (default: gesden).",
+        ),
         source: str = typer.Option(
             ...,
             "--source",
-            help="DSN like 'gesden://server\\SQLEXPRESS/SOURCE_DB'",
+            help="Source DSN or local database path, depending on the adapter.",
         ),
         output: Path = typer.Option(..., "--output", "-o", help="Path of the .dpm file to write"),
         user: str | None = typer.Option(None, "--user", help="SQL Server login"),
@@ -236,7 +295,7 @@ def register(app: typer.Typer) -> None:
             ),
         ),
     ) -> None:
-        """Extract a Gesdén database into a DPMF file."""
+        """Extract an origin database into a DPMF file."""
         rc = run(
             source,
             output,
@@ -250,5 +309,6 @@ def register(app: typer.Typer) -> None:
             resume=not no_resume,
             compress=compress,
             dpmf_passphrase=dpmf_passphrase,
+            adapter_name=adapter_name,
         )
         raise typer.Exit(code=rc)

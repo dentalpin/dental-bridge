@@ -1,8 +1,7 @@
 # Windows deployment guide
 
 Step-by-step instructions for running `dental-bridge` on a clinic's
-Windows server (where Gesdén lives). Intended for IT integrators and
-clinic system administrators.
+Windows server. Intended for IT integrators and clinic system administrators.
 
 ## 1. Target environment
 
@@ -10,14 +9,15 @@ A `dental-bridge` binary supports:
 
 - Windows Server 2012 R2 or later, or Windows 10 / 11.
 - 64-bit only (x64).
-- SQL Server 2008 R2 → 2022, instance running locally or reachable over
-  TCP/IP on port 1433 (default) or a custom port.
-- Microsoft **ODBC Driver 18 for SQL Server**.
+- Gesdén: SQL Server 2008 R2 → 2022, locally or reachable over TCP/IP, with
+  Microsoft **ODBC Driver 18 for SQL Server**.
+- Nemodent: a local `.mdb` copy and the 64-bit Microsoft Access ODBC driver.
 
-## 2. Install Microsoft ODBC Driver 18
+## 2. Install the source ODBC driver
 
-Required. The tool refuses to start without it and points at the
-download page in its error message.
+Install the driver required by the source adapter you plan to use.
+
+### Gesdén: ODBC Driver 18 for SQL Server
 
 1. Open
    <https://learn.microsoft.com/sql/connect/odbc/download-odbc-driver-for-sql-server>.
@@ -25,8 +25,18 @@ download page in its error message.
 3. Run the installer (admin rights required). Accept defaults.
 4. Confirm registration:
    ```powershell
-   Get-OdbcDriver -Name 'ODBC Driver 18 for SQL Server'
-   ```
+    Get-OdbcDriver -Name 'ODBC Driver 18 for SQL Server'
+    ```
+
+### Nemodent: Access ODBC driver
+
+Install the 64-bit Microsoft Access ODBC driver (usually installed with
+Microsoft Access or the Access Database Engine). Its bitness must match the
+x64 `dental-bridge` executable. Confirm registration with:
+
+```powershell
+Get-OdbcDriver | Where-Object Name -Like '*Access*'
+```
 
 ## 3. Download the dental-bridge binary
 
@@ -121,6 +131,24 @@ ODBC Driver 18 enforces TLS by default. Older SQL Server installs
 driver will refuse to accept unless you pass `--trust-server-certificate`.
 On a private LAN that is the right choice — the clinic's SQL Server is
 not exposed publicly.
+
+## Nemodent (local Access MDB)
+
+Use a consistent local copy of the `.mdb` file. The adapter opens it read-only
+through Access ODBC and supports `extract` only; SQL Server credentials and
+TLS options do not apply:
+
+```powershell
+.\dental-bridge.exe extract `
+    --adapter nemodent `
+    --source "C:\Nemodent\Nemodent.mdb" `
+    --output "C:\Nemodent\export.dpm"
+```
+
+Unknown schema fingerprints are rejected by default. Use
+`--allow-unknown-schema` only after reviewing the detected schema and the
+adapter's allowlisted columns. See [`nemodent-quirks.md`](nemodent-quirks.md)
+for mappings and intentionally unsupported data.
 
 ## 7. Finding the Gesdén image folder
 
