@@ -71,3 +71,32 @@ renames or translations.
 
 To be populated entity by entity as Sprint 1 onwards builds the
 corresponding Pydantic models.
+
+### Debt
+
+| Field | Type | Meaning |
+|---|---|---|
+| `opening_balance` | Optional boolean | `true` identifies a patient's net opening balance carried over from the source system. Absent or `false` denotes an ordinary debt row. |
+| `description` | Optional string | Human-readable label for the debt or opening balance. Consumers may truncate it; DentalPin stores up to 160 characters. |
+
+An opening balance uses the existing `owed_amount` field. Positive
+amounts represent receivables and negative amounts represent credit.
+An opening balance may be independent of any applied treatment. Use one
+stable `canonical_uuid` per patient's opening balance so the same balance
+can be recognized when the package is imported again.
+
+### FiscalDocumentLine
+
+A line may include a direct catalog reference even when it has no
+`applied_treatment_uuid`.
+
+| Field | Type | Target |
+|---|---|---|
+| `treatment_uuid` | Optional UUID | Canonical UUID of a `TreatmentCatalogItem` |
+| `treatment_variant_uuid` | Optional UUID | Canonical UUID of a `TreatmentCatalogVariant` |
+
+Both fields may be omitted or null. When both are provided, producers
+should reference a treatment and one of its variants. Consumers may use
+the catalog references to identify the service without deriving it from
+an applied treatment. The line carries its billed concept, amounts and
+taxes independently of the catalog.
